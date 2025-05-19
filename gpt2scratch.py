@@ -3,7 +3,7 @@ from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import torch
 
 # Load pre-trained model and tokenizer
-model_name = "gpt2"  # You can use "gpt2-medium", "gpt2-large", etc.
+model_name = "gpt2-xl"  # You can use "gpt2-medium", "gpt2-large", etc.
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
 model = GPT2LMHeadModel.from_pretrained(model_name)
 model.eval()
