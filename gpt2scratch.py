@@ -11,6 +11,8 @@ model = GPT2LMHeadModel.from_pretrained(model_name)
 model.eval()
 model.to(device)
 
+print (f"Model: {model_name}")
+
 if (__name__ == "__main__"):
 
     if len(sys.argv) > 1:
@@ -30,7 +32,6 @@ if (__name__ == "__main__"):
         outputs = model.generate(
             **inputs, 
             max_new_tokens=50,
-            max_length=50,
             pad_token_id=tokenizer.eos_token_id)
     
         outputs = outputs.cpu()
