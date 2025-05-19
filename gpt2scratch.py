@@ -2,12 +2,14 @@ import sys
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import torch
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 # Load pre-trained model and tokenizer
 model_name = "gpt2-xl"  # You can use "gpt2-medium", "gpt2-large", etc.
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
 model = GPT2LMHeadModel.from_pretrained(model_name)
 model.eval()
-
+model.to(device)
 
 if (__name__ == "__main__"):
 
