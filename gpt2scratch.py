@@ -18,17 +18,21 @@ if (__name__ == "__main__"):
     else:
         prompt = "What is the capital of France?"
     
-    print(prompt)
-    print("....")
+        print(prompt)
+        
+    while(True):
+        print("....")
 
-    inputs = tokenizer(prompt, return_tensors="pt")
+        inputs = tokenizer(prompt, return_tensors="pt")
 
 
-    inputs.to(device)
+        inputs.to(device)
 
-    outputs = model.generate(**inputs, max_new_tokens=50)
+        outputs = model.generate(**inputs, max_new_tokens=50)
     
-    outputs = outputs.cpu()
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        outputs = outputs.cpu()
+        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-    print(response)
+        print(response)
+
+        prompt = input("Enter a prompt:")
