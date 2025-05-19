@@ -25,10 +25,13 @@ if (__name__ == "__main__"):
 
         inputs = tokenizer(prompt, return_tensors="pt")
 
-
         inputs.to(device)
 
-        outputs = model.generate(**inputs, max_new_tokens=50)
+        outputs = model.generate(
+            **inputs, 
+            max_new_tokens=50,
+            max_length=50,
+            pad_token_id=tokenizer.eos_token_id)
     
         outputs = outputs.cpu()
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
