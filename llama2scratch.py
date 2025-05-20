@@ -1,6 +1,7 @@
 import sys
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
+import json
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -14,27 +15,44 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 model.eval()
 
+def process_prompt(prompt):
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=50,
+        pad_token_id=tokenizer.eos_token_id
+    )
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    return response
+
+
 print (f"Model: {model_name}")
+
+def load_slang(file_path = "extended_slang_terms_since_2022.json"):
+    # Load the file
+    with open(file_path, "r") as f:
+        slang_data = json.load(f)
+
+    # Example: print each term and its meanings
+    for entry in slang_data:
+        return entry['Term']
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         prompt = sys.argv[1]
     else:
-        prompt = "What is the capital of France?"
-        print(prompt)
+        prompt = ""
+
+    if (prompt == ""):
+        for slang in load_slang():
+            response = process_prompt(f"What does '{slang}' mean?")
+            print(response)
 
     while True:
         print("....")
-
-        inputs = tokenizer(prompt, return_tensors="pt").to(device)
-
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=50,
-            pad_token_id=tokenizer.eos_token_id
-        )
-
-        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        response = process_prompt(prompt)
         print(response)
 
         lastprompt = prompt
