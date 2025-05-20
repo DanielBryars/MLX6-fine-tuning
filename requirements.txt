@@ -31,3 +31,5 @@ dotenv
 accelerate
 peft 
 bitsandbytes
+accelerate 
+trl
