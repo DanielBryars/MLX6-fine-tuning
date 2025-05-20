@@ -38,7 +38,7 @@ if __name__ == "__main__":
         print(response)
 
         lastprompt = prompt
-        prompt = input("Enter a prompt (or hit <enter> to repeat the last prompt):")
+        prompt = input(f"{model_name} ready. Enter a prompt (or hit <enter> to repeat the last prompt):")
         if prompt == "":
             #enter to repeat last prompt
             prompt = lastprompt
