@@ -47,17 +47,18 @@ if __name__ == "__main__":
         for slang, year, before, after in load_slang():
 
             prompt = f"What does '{slang}' mean?"
+            print(prompt)
             response = process_prompt(prompt)
 
-            print(f"Expected:{before}")
+            print(f"Expected Before:{before}")
+            print(f"Expected After:{after}")
 
             print("*******************************************")
-            print("Model Response")
+            print("Actual Response:")
             print(response)
             print("*******************************************")
-
-            print(f"After:{after}")
-
+            print()
+        exit
 
     while True:
         print("....")
