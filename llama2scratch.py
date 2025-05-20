@@ -30,7 +30,7 @@ def process_prompt(prompt):
 
 print (f"Model: {model_name}")
 
-def load_slang(file_path = "extended_slang_terms_since_2022.json"):
+def load_slang(file_path = "slang_terms_since_2022.json"):
     # Load the file
     with open(file_path, "r") as f:
         slang_data = json.load(f)
