@@ -28,3 +28,4 @@ transformers
 #openai
 dotenv
 #spacy
+accelerate

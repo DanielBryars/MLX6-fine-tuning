@@ -37,4 +37,8 @@ if __name__ == "__main__":
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
         print(response)
 
-        prompt = input("Enter a prompt:")
+        lastprompt = prompt
+        prompt = input("Enter a prompt (or hit <enter> to repeat the last prompt):")
+        if prompt == "":
+            #enter to repeat last prompt
+            prompt = lastprompt
