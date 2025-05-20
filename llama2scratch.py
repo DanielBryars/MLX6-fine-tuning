@@ -31,13 +31,11 @@ def process_prompt(prompt):
 print (f"Model: {model_name}")
 
 def load_slang(file_path = "slang_terms_since_2022.json"):
-    # Load the file
     with open(file_path, "r") as f:
         slang_data = json.load(f)
 
-    # Example: print each term and its meanings
     for entry in slang_data:
-        yield entry['Term']
+        yield entry['Term'], entry['Year Became Slang'], entry['Meaning Before'], entry['Meaning After']
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
@@ -46,11 +44,20 @@ if __name__ == "__main__":
         prompt = ""
 
     if (prompt == ""):
-        for slang in load_slang():
+        for slang, year, before, after in load_slang():
+
             prompt = f"What does '{slang}' mean?"
             response = process_prompt(prompt)
-            print()
+
+            print(f"Expected:{before}")
+
+            print("*******************************************")
+            print("Model Response")
             print(response)
+            print("*******************************************")
+
+            print(f"After:{after}")
+
 
     while True:
         print("....")
