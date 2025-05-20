@@ -50,15 +50,16 @@ if __name__ == "__main__":
             print(prompt)
             response = process_prompt(prompt)
 
-            print(f"Expected Before:{before}")
-            print(f"Expected After:{after}")
+            print(f"Expected Before {year}:{before}")
+            print(f"Expected After {year}:{after}")
 
             print("*******************************************")
             print("Actual Response:")
             print(response)
             print("*******************************************")
             print()
-        exit
+        
+        sys.exit()
 
     while True:
         print("....")
