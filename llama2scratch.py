@@ -37,7 +37,7 @@ def load_slang(file_path = "slang_terms_since_2022.json"):
 
     # Example: print each term and its meanings
     for entry in slang_data:
-        return entry['Term']
+        yield entry['Term']
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
@@ -47,7 +47,9 @@ if __name__ == "__main__":
 
     if (prompt == ""):
         for slang in load_slang():
-            response = process_prompt(f"What does '{slang}' mean?")
+            prompt = f"What does '{slang}' mean?"
+            response = process_prompt(prompt)
+            print()
             print(response)
 
     while True:
