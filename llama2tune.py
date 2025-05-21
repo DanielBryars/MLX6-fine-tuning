@@ -1,3 +1,4 @@
+import sys
 import os
 import torch
 from datasets import load_dataset
@@ -13,18 +14,43 @@ from peft import LoraConfig
 from trl import SFTTrainer
 from datasets import load_dataset
 
+from llama2scratch import test_slang
+
+import trl
+print(trl.__version__)
+
+from trl import SFTTrainer
+import inspect
+print(inspect.getfile(SFTTrainer))
+
 base_model = "meta-llama/Llama-2-7b-chat-hf"
 new_model = "llama-2-7b-chat-cold"
 
 dataset = load_dataset("json", data_files="slang.jsonl")["train"]
 
 # Format into prompt + response for training
+#def format_example(example):
+#    return {
+#        "text": f"{example['prompt']}\n{example['completion']}"
+#    }
+
 def format_example(example):
+    #see https://www.llama.com/docs/model-cards-and-prompt-formats/meta-llama-2/
     return {
-        "text": f"{example['prompt']}\n{example['completion']}"
+        "text": f"<s>[INST] {example['prompt']} [/INST] {example['completion']}</s>"
     }
 
+
 dataset = dataset.map(format_example)
+
+DEBUG_DS = False
+
+if DEBUG_DS:
+    for i, row in enumerate(dataset):
+        print("Training Example:")
+        print(row["text"])
+        if i >= 4:  # limit to first 5 rows
+            break
 
 compute_dtype = getattr(torch, "float16")
 
@@ -35,17 +61,6 @@ quant_config = BitsAndBytesConfig(
     bnb_4bit_use_double_quant=False,
 )
 
-tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
-tokenizer.pad_token = tokenizer.eos_token
-tokenizer.padding_side = "right"
-
-peft_params = LoraConfig(
-    lora_alpha=16,
-    lora_dropout=0.1,
-    r=64,
-    bias="none",
-    task_type="CAUSAL_LM",
-)
 
 training_params = TrainingArguments(
     output_dir="./results",
@@ -64,19 +79,57 @@ training_params = TrainingArguments(
     warmup_ratio=0.03,
     group_by_length=True,
     lr_scheduler_type="constant",
-    report_to="tensorboard"
+    report_to="wandb", 
+    run_name="llama-slang-001"   
 )
+
+model = AutoModelForCausalLM.from_pretrained(
+    base_model,
+    quantization_config=quant_config,
+    device_map={"": 0}
+)
+model.config.use_cache = False
+model.config.pretraining_tp = 1
+
+tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+tokenizer.pad_token = tokenizer.eos_token
+tokenizer.padding_side = "right"
+
+peft_params = LoraConfig(
+    lora_alpha=16,
+    lora_dropout=0.1,
+    r=64,
+    bias="none",
+    task_type="CAUSAL_LM",
+)
+
+#packing=False,
+    #max_seq_length=None,
+    #dataset_text_field="text",
+
 
 trainer = SFTTrainer(
     model=model,
     train_dataset=dataset,
     peft_config=peft_params,
-    dataset_text_field="text",
-    max_seq_length=None,
-    tokenizer=tokenizer,
+    processing_class=tokenizer,
     args=training_params,
-    packing=False,
+    
 )
+
+print("BEFORE FINETUNING")
+model.eval()
+test_slang(model,tokenizer,file_path="slang_terms_short.json")
+
+model.train()
+
+trainer.train()
 
 trainer.model.save_pretrained(new_model)
 trainer.tokenizer.save_pretrained(new_model)
+
+print()
+print("AFTER FINETUNING")
+
+model.eval()
+test_slang(model,tokenizer)     

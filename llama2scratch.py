@@ -7,15 +7,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 model_name = "meta-llama/Llama-2-7b-chat-hf"
 
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
-    torch_dtype=torch.float16,
-    device_map="auto"
-)
-model.eval()
-
-def process_prompt(prompt):
+def process_prompt(model, tokenizer, prompt):
+    prompt=f"<s>[INST] {prompt}  [/INST]"
+    
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
 
     outputs = model.generate(
@@ -30,6 +24,18 @@ def process_prompt(prompt):
 
 print (f"Model: {model_name}")
 
+def test_slang(model, tokenizer, file_path="slang_terms_since_2022.json"):
+    for slang, year, before, after in load_slang(file_path):
+
+            prompt = f"What does '{slang}' mean?"
+            response = process_prompt(model, tokenizer,prompt)
+            print(f"Actual:{response}")
+            print(f"{before}")
+            print(f"{after}")
+        
+    sys.exit()
+
+
 def load_slang(file_path = "slang_terms_since_2022.json"):
     with open(file_path, "r") as f:
         slang_data = json.load(f)
@@ -43,23 +49,16 @@ if __name__ == "__main__":
     else:
         prompt = ""
 
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype=torch.float16,
+        device_map="auto"
+    )
+    model.eval()
+
     if (prompt == ""):
-        for slang, year, before, after in load_slang():
-
-            prompt = f"What does '{slang}' mean?"
-            print(prompt)
-            response = process_prompt(prompt)
-
-            print(f"Expected Before {year}:{before}")
-            print(f"Expected After {year}:{after}")
-
-            print("*******************************************")
-            print("Actual Response:")
-            print(response)
-            print("*******************************************")
-            print()
-        
-        sys.exit()
+        test_slang(model,tokenizer)        
 
     while True:
         print("....")
