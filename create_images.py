@@ -48,3 +48,12 @@ if __name__ == "__main__":
     print(dsl)
     image = render(dsl)
     image.show()
+
+    a = input("s to save reference.png")
+    if (a == "s"):
+        print("Saving .....")
+        image.save("reference.png", format="PNG")
+        with open("reference.dsl.txt", "w") as f:
+            f.write(dsl)
+    else:
+        print("Skipped saving")

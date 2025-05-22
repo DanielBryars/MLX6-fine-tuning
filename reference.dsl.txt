@@ -1,0 +1,6 @@
+<StartDiagram>
+<Medium><Circle><TopLeft>
+<Large><Triangle><TopRight>
+<Small><Square><BottomLeft>
+<Medium><Triangle><BottomRight>
+<EndDiagram>

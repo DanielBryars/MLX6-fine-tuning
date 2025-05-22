@@ -3,7 +3,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-model_id = "meta-llama/Meta-Llama-3-8B"
+#model_id = "meta-llama/Meta-Llama-3-8B"
+model_id = "meta-llama/Llama-3.1-8B"
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(

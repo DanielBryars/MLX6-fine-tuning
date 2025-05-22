@@ -3,8 +3,9 @@ import open_clip
 from PIL import Image
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
-# Load model
-model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k', device=device)
 tokenizer = open_clip.get_tokenizer('ViT-B-32')
 
 # Load and preprocess image
@@ -20,6 +21,6 @@ def get_clip_image_embedding(image_tensor):
 
 # Example usage
 if __name__ == "__main__":
-    image_tensor = load_image("your_image.png")
+    image_tensor = load_image("example.png")
     embedding = get_clip_image_embedding(image_tensor)
     print("Image embedding shape:", embedding.shape)
