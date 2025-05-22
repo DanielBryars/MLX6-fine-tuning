@@ -88,7 +88,7 @@ def render(dsl_string, image_size=(250, 250)):
     return img
 
 def save_dsl(dsl, filename):
-    dsl  = re.sub(r"\s+", "", s)
+    dsl  = re.sub(r"\s+", "", dsl)
     with open(filename, "w") as f:
         f.write(dsl)
 
