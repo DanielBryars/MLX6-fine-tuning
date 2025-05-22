@@ -74,7 +74,7 @@ def render(dsl_string, image_size=(250, 250)):
         shape = tokens[i + 1] 
         if shape not in SHAPES:
             raise ValueError(f"Unknown shape: {shape}")
-        render_method = SHAPES[shape]
+        render_method = SHAPES[shape]Large
         
         pos_token = tokens[i + 2]
         pos = POSITIONS.get(pos_token)
@@ -97,18 +97,18 @@ if __name__ == "__main__":
 
     # Example usage
     dsl = '''<StartDiagram> 
-    <Large><Square><TopLeft> 
+    <Large><Circle><TopLeft> 
     <Large><Square><TopRight> 
-    <Large><Square><BottomLeft> 
+    <Small><Square><BottomLeft> 
     <Large><Square><BottomRight> 
     <EndDiagram>'''
 
-    dsl = "<StartDiagram><Large><Circle><TopLeft><Small><Triangle><BottomRight><EndDiagram>"
+    #dsl = "<StartDiagram><Large><Circle><TopLeft><Small><Triangle><BottomRight><EndDiagram>"
 
     img = render(dsl)
 
-    save_dsl(dsl, "example.dsl.txt")
-    img.save("example.png", format="PNG")
+    #save_dsl(dsl, "example.dsl.txt")
+    #img.save("example.png", format="PNG")
 
     img.show()
 
