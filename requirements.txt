@@ -33,3 +33,5 @@ peft
 bitsandbytes
 accelerate 
 trl
+pillow
+torchvision
