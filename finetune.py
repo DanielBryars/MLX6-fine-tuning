@@ -24,7 +24,7 @@ epochs = 10
 # -------------------------
 # Initialise Weights & Biases
 # -------------------------
-wandb.init(project="MLX6-image-to-dsl-001", config={
+run = wandb.init(project="MLX6-image-to-dsl-001", config={
     "model": llm_model_id,
     "clip_encoder": clip_model_name,
     "clip_weights": clip_pretrained,
@@ -36,6 +36,8 @@ wandb.init(project="MLX6-image-to-dsl-001", config={
     "accum_steps": 4,
     "lr": 5e-5
 })
+
+config = run.config 
 
 # -------------------------
 # Load LLaMA 3.1 8B tokenizer and model (with LoRA)
@@ -179,7 +181,10 @@ def log_sample_inference():
             do_sample=False
         )
         decoded = llm_tokenizer.decode(output[0], skip_special_tokens=True)
+
+        print(f"{decoded}")
         wandb.log({"sample_prediction": decoded})
+
     llm_model.train()
 
 # -------------------------
