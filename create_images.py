@@ -44,16 +44,33 @@ def create_random_image():
 
 
 if __name__ == "__main__":
-    dsl = create_random_image_dsl(pretty=True)
-    print(dsl)
-    image = render(dsl)
-    image.show()
 
-    a = input("s to save reference.png")
-    if (a == "s"):
-        print("Saving .....")
-        image.save("reference.png", format="PNG")
-        with open("reference.dsl.txt", "w") as f:
-            f.write(dsl)
-    else:
-        print("Skipped saving")
+    lines = []
+
+    for i in range(1000):
+
+        dsl = create_random_image_dsl(pretty=False)
+        print(dsl)
+        image = render(dsl)
+
+        image_path = f"images/output_{i:04}.png" 
+        image.save(image_path, format="PNG")
+
+        lines.append(f"{dsl},{image_path}")
+
+
+
+    with open("training-data.txt", "w") as f:
+        f.write("\n".join(lines))
+
+
+'''
+        a = input("s to save reference.png")
+        if (a == "s"):
+            print("Saving .....")
+            image.save("reference.png", format="PNG")
+            with open("reference.dsl.txt", "w") as f:
+                f.write(dsl)
+        else:
+            print("Skipped saving")
+'''
