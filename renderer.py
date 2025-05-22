@@ -87,6 +87,12 @@ def render(dsl_string, image_size=(250, 250)):
 
     return img
 
+def save_dsl(dsl, filename):
+    dsl  = re.sub(r"\s+", "", s)
+    with open(filename, "w") as f:
+        f.write(dsl)
+
+
 if __name__ == "__main__":
 
     # Example usage
@@ -96,7 +102,14 @@ if __name__ == "__main__":
     <Large><Square><BottomLeft> 
     <Large><Square><BottomRight> 
     <EndDiagram>'''
+
+    dsl = "<StartDiagram><Large><Circle><TopLeft><Small><Triangle><BottomRight><EndDiagram>"
+
     img = render(dsl)
+
+    save_dsl(dsl, "example.dsl.txt")
+    img.save("example.png", format="PNG")
+
     img.show()
 
     

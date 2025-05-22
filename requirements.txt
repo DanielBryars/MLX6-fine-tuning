@@ -35,3 +35,4 @@ accelerate
 trl
 pillow
 torchvision
+open-clip-torch
