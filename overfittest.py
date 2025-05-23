@@ -22,11 +22,12 @@ batch_size = 4
 epochs = 10
 example_dsl_filename = "example.dsl.txt"
 example_png_filename = "example.png"
+num_image_patches = 49
 
 # -------------------------
 # Initialise Weights & Biases
 # -------------------------
-run = wandb.init(project="MLX6-image-to-dsl-003", config={
+run = wandb.init(project="MLX6-image-to-dsl-overfit-004", config={
     "model": llm_model_id,
     "clip_encoder": clip_model_name,
     "clip_weights": clip_pretrained,
@@ -65,7 +66,8 @@ llm_model = get_peft_model(base_model, lora_config)
 
 special_tokens = {
     "additional_special_tokens": [
-        "<start_of_image>", "<end_of_image>",
+        f"<image_patch_{i}>" for i in range(num_image_patches)
+    ] + [
         "<StartDiagram>", "<EndDiagram>",
         "<Large>", "<Medium>", "<Small>",
         "<Circle>", "<Square>", "<Triangle>",
@@ -75,6 +77,9 @@ special_tokens = {
 llm_tokenizer.add_special_tokens(special_tokens)
 llm_model.resize_token_embeddings(len(llm_tokenizer))
 
+# -------------------------
+# Load and Freeze CLIP
+# -------------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
     clip_model_name,
@@ -82,18 +87,17 @@ clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
     device=device
 )
 clip_model.eval()
+for p in clip_model.parameters():
+    p.requires_grad = False
 
-# Load example image and DSL
-example_dsl = Path(example_dsl_filename).read_text().strip()
-example_image_tensor = clip_preprocess(Image.open(example_png_filename).convert("RGB")).unsqueeze(0).to(device)
-with torch.no_grad():
-    example_clip_emb = clip_model.encode_image(example_image_tensor).squeeze(0).float()
-example_projected = nn.Linear(clip_model.visual.output_dim, llm_model.config.hidden_size).to(device)(example_clip_emb).unsqueeze(0)
-
-# Projection from CLIP to LLM hidden size
 clip_dim = clip_model.visual.output_dim
 llm_dim = llm_model.config.hidden_size
-clip_to_llm = nn.Linear(clip_dim, llm_dim).to(device)
+clip_to_llm = nn.Linear(clip_dim, llm_dim).to(device)  # this stays trainable
+
+# -------------------------
+# Load example DSL
+# -------------------------
+example_dsl = Path(example_dsl_filename).read_text().strip()
 
 # -------------------------
 # Dataset
@@ -111,31 +115,106 @@ class DSLDataset(Dataset):
         dsl = row["dsl"]
         image_path = Path(row["image_path"])
 
-        example_prompt = (
+        image_patch_tokens = " ".join([f"<image_patch_{i}>" for i in range(num_image_patches)])
+
+        prompt = (
             "Here's a DSL for representing very simple diagrams:\n\n"
             "<Square> <Triangle> <Circle>\n"
             "<TopLeft> <TopRight> <BottomLeft> <BottomRight> <Large> <Medium> <Small>\n\n"
             "Using that DSL, this diagram:\n"
-            "<start_of_image><end_of_image>\n"
+            f"{image_patch_tokens}\n"
             "corresponds to this markup:\n"
             f"{example_dsl}\n\n"
             "Now use the DSL to write the markup which would generate the following diagram:\n"
-            "<start_of_image><end_of_image>"
+            f"{image_patch_tokens}"
         )
-        prompt = example_prompt
+
         input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.squeeze(0)
         label_ids = self.tokenizer(dsl, return_tensors="pt").input_ids.squeeze(0)
 
         image_tensor = clip_preprocess(Image.open(image_path).convert("RGB")).unsqueeze(0).to(device)
         with torch.no_grad():
-            clip_emb = clip_model.encode_image(image_tensor).squeeze(0).float()
-        projected_clip = clip_to_llm(clip_emb).unsqueeze(0)
+            patch_embeds = clip_model.visual.forward_features(image_tensor)[:, 1:, :].float()  # drop CLS
+            projected = clip_to_llm(patch_embeds).squeeze(0).detach()  # shape: (49, hidden)
 
         return {
             "input_ids": input_ids,
-            "clip_embedding": projected_clip,
+            "image_patches": projected,
             "labels": label_ids
         }
+
+# -------------------------
+# Collate Function
+# -------------------------
+def collate_fn(batch):
+    input_ids = [b["input_ids"] for b in batch]
+    labels = [b["labels"] for b in batch]
+    image_embeds = [b["image_patches"] for b in batch]
+
+    input_ids = nn.utils.rnn.pad_sequence(input_ids, batch_first=True, padding_value=llm_tokenizer.pad_token_id)
+    labels_padded = torch.full_like(input_ids, fill_value=-100)
+    for i, label in enumerate(labels):
+        if len(label) > input_ids.shape[1]:
+            raise ValueError("Label sequence is longer than input sequence")
+        labels_padded[i, -len(label):] = label
+
+    input_ids = input_ids.to(device)
+    inputs_embeds = llm_model.get_input_embeddings()(input_ids)
+
+    for i, patches in enumerate(image_embeds):
+        for j in range(num_image_patches):
+            tok_id = llm_tokenizer.convert_tokens_to_ids(f"<image_patch_{j}>")
+            idxs = (input_ids[i] == tok_id).nonzero(as_tuple=True)[0]
+            if len(idxs):
+                inputs_embeds[i, idxs[0]] = patches[j].to(inputs_embeds.dtype)
+
+    return {
+        "inputs_embeds": inputs_embeds.to(device),
+        "labels": labels_padded.to(device)
+    }
+
+
+# -------------------------
+# Prepare Data (One-sample overfit test)
+# -------------------------
+dataset = DSLDataset(csv_path)
+overfit_sample = dataset[0]
+dataset = [overfit_sample]
+train_dataset = [overfit_sample]
+val_dataset = [overfit_sample]
+
+train_loader = DataLoader(train_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
+val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
+
+# -------------------------
+# Inference Logging (Trimmed Output)
+# -------------------------
+def log_sample_inference():
+    llm_model.eval()
+    with torch.no_grad():
+        sample = val_dataset[0]  # always the same sample
+        input_ids = sample["input_ids"].unsqueeze(0).to(device)
+        attention_mask = torch.ones_like(input_ids)
+        output = llm_model.generate(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            max_length=input_ids.shape[1] + 64,
+            do_sample=False
+        )
+        decoded = llm_tokenizer.decode(output[0], skip_special_tokens=True)
+        split_key = "Now use the DSL to write the markup which would generate the following diagram:"
+        if split_key in decoded:
+            dsl_output = decoded.split(split_key)[-1].strip()
+        else:
+            dsl_output = decoded.strip()
+
+        print("--- Model Prediction ---")
+        print(dsl_output)
+        print("------------------------")
+
+        wandb.log({"sample_prediction": dsl_output})
+
+    llm_model.train()
 
 # -------------------------
 # Validation
@@ -155,76 +234,14 @@ def evaluate_validation():
     llm_model.train()
 
 # -------------------------
-# Collate Function
-# -------------------------
-def collate_fn(batch):
-    input_ids = [b["input_ids"] for b in batch]
-    labels = [b["labels"] for b in batch]
-    image_embeds = [b["clip_embedding"] for b in batch]
-
-    input_ids = nn.utils.rnn.pad_sequence(input_ids, batch_first=True, padding_value=llm_tokenizer.pad_token_id)
-    labels_padded = torch.full_like(input_ids, fill_value=-100)
-    for i, label in enumerate(labels):
-        if len(label) > input_ids.shape[1]:
-            raise ValueError("Label sequence is longer than input sequence")
-        labels_padded[i, -len(label):] = label
-
-    input_ids = input_ids.to(device)
-    inputs_embeds = llm_model.get_input_embeddings()(input_ids)
-
-    for i, embed in enumerate(image_embeds):
-        idxs = (input_ids[i] == llm_tokenizer.convert_tokens_to_ids("<start_of_image>")).nonzero(as_tuple=True)[0]
-        if len(idxs) >= 2:
-            inputs_embeds[i, idxs[0]] = example_projected.squeeze(0).detach().to(inputs_embeds.dtype)
-            inputs_embeds[i, idxs[1]] = embed.to(inputs_embeds.dtype)
-
-    return {
-        "inputs_embeds": inputs_embeds.to(device),
-        "labels": labels_padded.to(device)
-    }
-
-# -------------------------
-# Prepare Data
-# -------------------------
-dataset = DSLDataset(csv_path)
-train_size = int(0.9 * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
-
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
-val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
-
-# -------------------------
-# Inference Logging
-# -------------------------
-def log_sample_inference():
-    llm_model.eval()
-    with torch.no_grad():
-        sample = random.choice(val_dataset)
-        input_ids = sample["input_ids"].unsqueeze(0).to(device)
-        attention_mask = torch.ones_like(input_ids)
-        output = llm_model.generate(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            max_length=input_ids.shape[1] + 64,
-            do_sample=False
-        )
-        decoded = llm_tokenizer.decode(output[0], skip_special_tokens=True)
-
-        print(f"{decoded}")
-        wandb.log({"sample_prediction": decoded})
-
-    llm_model.train()
-
-# -------------------------
 # Training Loop
 # -------------------------
 def train():
     llm_model.train()
     optimizer = torch.optim.AdamW(llm_model.parameters(), lr=5e-5)
 
-    for epoch in range(epochs):
-        loop = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}")
+    for epoch in range(20):  # longer for overfitting
+        loop = tqdm(train_loader, desc=f"Epoch {epoch+1}/20")
         for step, batch in enumerate(loop):
             optimizer.zero_grad()
             outputs = llm_model(**batch)
