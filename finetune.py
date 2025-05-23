@@ -77,7 +77,14 @@ llm_model.resize_token_embeddings(len(llm_tokenizer))
 start_image_token_id = llm_tokenizer.convert_tokens_to_ids("<start_of_image>")
 end_image_token_id = llm_tokenizer.convert_tokens_to_ids("<end_of_image>")
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available()
+
+example_dsl = Path("/mnt/data/example.dsl.txt").read_text().strip()
+example_image_tensor = clip_preprocess(Image.open("/mnt/data/example.png").convert("RGB")).unsqueeze(0).to(device)
+with torch.no_grad():
+    example_clip_emb = clip_model.encode_image(example_image_tensor).squeeze(0).float()
+example_projected = clip_to_llm(example_clip_emb).unsqueeze(0)
+ else "cpu")
 clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
     clip_model_name,
     pretrained=clip_pretrained,
@@ -143,11 +150,12 @@ def collate_fn(batch):
     input_ids = input_ids.to(device)
     inputs_embeds = llm_model.get_input_embeddings()(input_ids)
 
+    
     for i, embed in enumerate(image_embeds):
-        # Find the <start_of_image> token and insert the image embedding
-        idx = (input_ids[i] == start_image_token_id).nonzero(as_tuple=True)[0]
-        if len(idx) > 0:
-            inputs_embeds[i, idx[0]] = embed.to(inputs_embeds.dtype)
+        idxs = (input_ids[i] == start_image_token_id).nonzero(as_tuple=True)[0]
+        if len(idxs) >= 2:
+            inputs_embeds[i, idxs[0]] = example_projected.squeeze(0).to(inputs_embeds.dtype)
+            inputs_embeds[i, idxs[1]] = embed.to(inputs_embeds.dtype)
 
     return {
         "inputs_embeds": inputs_embeds.to(device),
