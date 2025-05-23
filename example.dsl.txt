@@ -1,1 +1,0 @@
-<StartDiagram><Large><Circle><TopLeft><Small><Triangle><BottomRight><EndDiagram>
